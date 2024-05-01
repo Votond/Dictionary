@@ -1,4 +1,6 @@
-﻿namespace Dictionary;
+﻿using System.Text;
+
+namespace Dictionary;
 
 public static class ListUtils
 {
@@ -6,5 +8,15 @@ public static class ListUtils
     {
         list.Add(el);
         return list;
+    }
+
+    public static string FormatTranslations(List<string> translations)
+    {
+        StringBuilder builder = new StringBuilder();
+
+        foreach (var translation in translations)
+            builder.Append($"- {translation}\n");
+
+        return builder.ToString();
     }
 }

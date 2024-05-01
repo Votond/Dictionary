@@ -65,11 +65,13 @@ namespace Dictionary
         private ReceiverOptions _receiverOptions;
         private User _me;
 
-        private Dictionary</* chatId */ long, UserAction> _usersActions = new();
-        private Dictionary</* chatId */ long, List<string>> _usersData = new();
+        private readonly Dictionary</* chatId */ long, UserAction> _usersActions = new();
+        private readonly Dictionary</* chatId */ long, List<string>> _usersData = new();
 
         public async Task Start()
         {
+            Dictionary.Dictionaries = DictionarySerializerImp.Instance.Deserialize();
+
             _botClient = new(Token);
             _cts = new();
             _receiverOptions = new() { AllowedUpdates = Array.Empty<UpdateType>() };
@@ -84,7 +86,11 @@ namespace Dictionary
             _me = await _botClient.GetMeAsync();
         }
 
-        public void Stop() => _cts.Cancel();
+        public void Stop()
+        {
+            _cts.Cancel();
+            DictionarySerializerImp.Instance.Serialize(Dictionary.Dictionaries);
+        }
 
         private async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
@@ -101,7 +107,8 @@ namespace Dictionary
                 switch (_usersActions[chatId])
                 {
                     case UserAction.DictionaryTypeInput:
-                        // TODO createNewDictionary(messageText);
+                        Dictionary.Dictionaries.Add(new Dictionary(messageText));
+
                         _usersActions.Remove(chatId);
                         SendMessage("Словарь успешно создан", MessageType.Success, chatId, cancellationToken);
                         break;
@@ -117,10 +124,18 @@ namespace Dictionary
                         break;
 
                     case UserAction.DictionaryTypeInputForTranslation:
-                        string? translation = null; // TODO translation = getTranslation(_usersData[chatId][0], messageText);
+                        if (Dictionary.GetDictionaryByType(messageText) == null)
+                        {
+                            SendMessage("Словарь не найден", MessageType.Error, chatId, cancellationToken);
+                            _usersData.Remove(chatId);
+                            _usersActions.Remove(chatId);
+                            break;
+                        }
+
+                        List<string>? translation = Dictionary.GetDictionaryByType(messageText)?.GetTranslation(_usersData[chatId][0]) ?? null;
                         
                         if (translation != null)
-                            SendMessage($"Перевод: {translation}", MessageType.Info, chatId, cancellationToken);
+                            SendMessage($"Перевод:\n{ListUtils.FormatTranslations(translation)}", MessageType.Info, chatId, cancellationToken);
                         else
                             SendMessage("Перевод не найден", MessageType.Error, chatId, cancellationToken);
                         
@@ -145,7 +160,16 @@ namespace Dictionary
                         break;
 
                     case UserAction.WordAdd_TranslationInput:
-                        // TODO wordAdd(_usersData[chatId][0], _usersData[chatId][1], messageText);
+                        if (Dictionary.GetDictionaryByType(_usersData[chatId][1]) == null)
+                        {
+                            SendMessage("Словарь не найден", MessageType.Error, chatId, cancellationToken);
+                            _usersData.Remove(chatId);
+                            _usersActions.Remove(chatId);
+                            break;
+                        }
+
+                        Dictionary.GetDictionaryByType(_usersData[chatId][1])?.AddWord(_usersData[chatId][0], messageText);
+
                         _usersData.Remove(chatId);
                         _usersActions.Remove(chatId);
                         SendMessage("Слово успешно добавлено", MessageType.Success, chatId, cancellationToken);
@@ -166,10 +190,19 @@ namespace Dictionary
                         break;
 
                     case UserAction.WordChange_NewWordInput:
-                        // TODO wordChange(_usersData[chatId][0], _usersData[chatId][1], messageText);
+                        if (Dictionary.GetDictionaryByType(_usersData[chatId][1]) == null)
+                        {
+                            SendMessage("Словарь не найден", MessageType.Error, chatId, cancellationToken);
+                            _usersData.Remove(chatId);
+                            _usersActions.Remove(chatId);
+                            break;
+                        }
+
+                        Dictionary.GetDictionaryByType(_usersData[chatId][1])?.ChangeWord(_usersData[chatId][0], messageText);
+
                         _usersData.Remove(chatId);
                         _usersActions.Remove(chatId);
-                        SendMessage("Словарь успешно изменено", MessageType.Success, chatId, cancellationToken);
+                        SendMessage("Слово успешно изменено", MessageType.Success, chatId, cancellationToken);
                         break;
 
 
@@ -181,7 +214,16 @@ namespace Dictionary
                         break;
 
                     case UserAction.WordRemove_DictionaryInput:
-                        // TODO wordRemove(_usersData[chatId][0], messageText)
+                        if (Dictionary.GetDictionaryByType(messageText) == null)
+                        {
+                            SendMessage("Словарь не найден", MessageType.Error, chatId, cancellationToken);
+                            _usersData.Remove(chatId);
+                            _usersActions.Remove(chatId);
+                            break;
+                        }
+
+                        Dictionary.GetDictionaryByType(messageText)?.RemoveWord(_usersData[chatId][0]);
+
                         _usersData.Remove(chatId);
                         _usersActions.Remove(chatId);
                         SendMessage("Слово успешно удалено", MessageType.Success, chatId, cancellationToken);
@@ -202,7 +244,16 @@ namespace Dictionary
                         break;
 
                     case UserAction.TranslationAdd_WordInput:
-                        // TODO translationAdd(_usersData[chatId][0], _usersData[chatId][1], messageText);
+                        if (Dictionary.GetDictionaryByType(_usersData[chatId][1]) == null)
+                        {
+                            SendMessage("Словарь не найден", MessageType.Error, chatId, cancellationToken);
+                            _usersData.Remove(chatId);
+                            _usersActions.Remove(chatId);
+                            break;
+                        }
+
+                        Dictionary.GetDictionaryByType(_usersData[chatId][1])?.AddTranslation(_usersData[chatId][0], messageText);
+
                         _usersData.Remove(chatId);
                         _usersActions.Remove(chatId);
                         SendMessage("Перевод успешно добавлен", MessageType.Success, chatId, cancellationToken);
@@ -229,7 +280,16 @@ namespace Dictionary
                         break;
 
                     case UserAction.TranslationChange_NewTranslationInput:
-                        // TODO translationChange(_usersData[chatId][0], _usersData[chatId][1], _usersData[chatId][2], messageText);
+                        if (Dictionary.GetDictionaryByType(_usersData[chatId][1]) == null)
+                        {
+                            SendMessage("Словарь не найден", MessageType.Error, chatId, cancellationToken);
+                            _usersData.Remove(chatId);
+                            _usersActions.Remove(chatId);
+                            break;
+                        }
+
+                        Dictionary.GetDictionaryByType(_usersData[chatId][1])?.ChangeTranslation(_usersData[chatId][0], _usersData[chatId][2], messageText);
+
                         _usersData.Remove(chatId);
                         _usersActions.Remove(chatId);
                         SendMessage("Перевод успешно изменён", MessageType.Success, chatId, cancellationToken);
@@ -250,10 +310,21 @@ namespace Dictionary
                         break;
 
                     case UserAction.TranslationRemove_WordInput:
-                        // TODO translationAdd(_usersData[chatId][0], _usersData[chatId][1], messageText);
+                        if (Dictionary.GetDictionaryByType(_usersData[chatId][1]) == null)
+                        {
+                            SendMessage("Словарь не найден", MessageType.Error, chatId, cancellationToken);
+                            _usersData.Remove(chatId);
+                            _usersActions.Remove(chatId);
+                            break;
+                        }
+
+                        if (Dictionary.GetDictionaryByType(_usersData[chatId][1])?.RemoveTranslation(_usersData[chatId][0], messageText) ?? false)
+                            SendMessage("Перевод успешно удалён", MessageType.Success, chatId, cancellationToken);
+                        else
+                            SendMessage("Нельзя удалить последний вариант перевода", MessageType.Error, chatId, cancellationToken);
+
                         _usersData.Remove(chatId);
                         _usersActions.Remove(chatId);
-                        SendMessage("Перевод успешно удалён", MessageType.Success, chatId, cancellationToken);
                         break;
                 }
             }
@@ -378,7 +449,7 @@ namespace Dictionary
                 new KeyboardButton[]
                 {
                     "Искать перевод",
-                    "Получить файл словаря"
+                    "Получить файл словарей"
                 }
             });
 
@@ -426,11 +497,11 @@ namespace Dictionary
 
         private void SendDictionaryFile(long chatId, CancellationToken cancellationToken)
         {
-            var stream = System.IO.File.OpenRead("PATH");
+            var stream = System.IO.File.OpenRead("dictionaries.json");
 
             _botClient.SendDocumentAsync(
                 chatId: chatId,
-                document: InputFile.FromStream(stream: stream, fileName: "Dictionaries.json"),
+                document: InputFile.FromStream(stream: stream, fileName: "dictionaries.json"),
                 cancellationToken: cancellationToken
             );
         }
