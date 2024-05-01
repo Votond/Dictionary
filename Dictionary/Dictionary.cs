@@ -15,7 +15,7 @@
                 WordMap.First(pair => pair.Key == word);
                 return WordMap.First(pair => pair.Key == word).Value;
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 return null;
             }
