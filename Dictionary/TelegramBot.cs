@@ -22,12 +22,16 @@ namespace Dictionary
 
         private enum UserAction
         {
-            DictionaryTypeInput,
+            DictionaryCreate_Input,
 
 
 
-            WordInputForTranslation,
-            DictionaryTypeInputForTranslation,
+            DictionaryDelete_Input,
+
+
+
+            Translation_WordInput,
+            Translation_DictionaryInput,
 
 
 
@@ -106,7 +110,14 @@ namespace Dictionary
             {
                 switch (_usersActions[chatId])
                 {
-                    case UserAction.DictionaryTypeInput:
+                    case UserAction.DictionaryCreate_Input:
+                        if (Dictionary.GetDictionaryByType(messageText) != null)
+                        {
+                            SendMessage("Такой словарь уже существует", MessageType.Error, chatId, cancellationToken);
+                            _usersActions.Remove(chatId);
+                            break;
+                        }
+
                         Dictionary.Dictionaries.Add(new Dictionary(messageText));
 
                         _usersActions.Remove(chatId);
@@ -117,13 +128,31 @@ namespace Dictionary
 
 
 
-                    case UserAction.WordInputForTranslation:
-                        SendMessage("Введите тип словаря", MessageType.Info, chatId, cancellationToken);
-                        _usersData.Add(chatId, [messageText]);
-                        _usersActions[chatId] = UserAction.DictionaryTypeInputForTranslation;
+                    case UserAction.DictionaryDelete_Input:
+                        if (Dictionary.GetDictionaryByType(messageText) == null)
+                        {
+                            SendMessage("Такого словаря не существует", MessageType.Error, chatId, cancellationToken);
+                            _usersActions.Remove(chatId);
+                            break;
+                        }
+
+                        Dictionary.Dictionaries.Remove(Dictionary.GetDictionaryByType(messageText));
+
+                        _usersActions.Remove(chatId);
+                        SendMessage("Словарь успешно удалён", MessageType.Success, chatId, cancellationToken);
                         break;
 
-                    case UserAction.DictionaryTypeInputForTranslation:
+
+
+
+
+                    case UserAction.Translation_WordInput:
+                        SendMessage("Введите тип словаря", MessageType.Info, chatId, cancellationToken);
+                        _usersData.Add(chatId, [messageText]);
+                        _usersActions[chatId] = UserAction.Translation_DictionaryInput;
+                        break;
+
+                    case UserAction.Translation_DictionaryInput:
                         if (Dictionary.GetDictionaryByType(messageText) == null)
                         {
                             SendMessage("Словарь не найден", MessageType.Error, chatId, cancellationToken);
@@ -338,7 +367,7 @@ namespace Dictionary
 
                     case "Создать словарь":
                         SendMessage("Введите тип словаря", MessageType.Info, chatId, cancellationToken);
-                        _usersActions.Add(chatId, UserAction.DictionaryTypeInput);
+                        _usersActions.Add(chatId, UserAction.DictionaryCreate_Input);
                         break;
 
                     case "Изменить слова/перевод":
@@ -381,11 +410,16 @@ namespace Dictionary
 
                     case "Искать перевод":
                         SendMessage("Введите слово", MessageType.Info, chatId, cancellationToken);
-                        _usersActions.Add(chatId, UserAction.WordInputForTranslation);
+                        _usersActions.Add(chatId, UserAction.Translation_WordInput);
                         break;
 
                     case "Получить файл словарей":
                         SendDictionaryFile(chatId, cancellationToken);
+                        break;
+
+                    case "Удалить словарь":
+                        SendMessage("Введите тип словаря", MessageType.Info, chatId, cancellationToken);
+                        _usersActions.Add(chatId, UserAction.DictionaryDelete_Input);
                         break;
 
                     default:
@@ -443,19 +477,20 @@ namespace Dictionary
                 new KeyboardButton[]
                 {
                     "Создать словарь",
-                    "Изменить слова/перевод"
+                    "Искать перевод",
+                    "Получить файл словарей"
                 },
 
                 new KeyboardButton[]
                 {
-                    "Искать перевод",
-                    "Получить файл словарей"
+                    "Изменить слова/перевод",
+                    "Удалить словарь"
                 }
             });
 
             _botClient.SendTextMessageAsync(
                 chatId: chatId,
-                text: "<b>Выберите действие:</b>\n\n📕 Создать словарь\n✏ Изменить слова/перевод\n📖 Искать перевод\n📄 Получить файл словаря",
+                text: "<b>Выберите действие:</b>\n\n📕 Создать словарь\n📖 Искать перевод\n📄 Получить файл словаря\n✏ Изменить слова/перевод\n❌ Удалить словарь",
                 parseMode: ParseMode.Html,
                 replyMarkup: buttons,
                 cancellationToken: cancellationToken
@@ -497,6 +532,7 @@ namespace Dictionary
 
         private void SendDictionaryFile(long chatId, CancellationToken cancellationToken)
         {
+            DictionarySerializerImp.Instance.Serialize(Dictionary.Dictionaries);
             var stream = System.IO.File.OpenRead("dictionaries.json");
 
             _botClient.SendDocumentAsync(
@@ -504,6 +540,8 @@ namespace Dictionary
                 document: InputFile.FromStream(stream: stream, fileName: "dictionaries.json"),
                 cancellationToken: cancellationToken
             );
+
+            stream.Close();
         }
     }
 }

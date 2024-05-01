@@ -4,7 +4,7 @@
     {
         public static List<Dictionary> Dictionaries = new();
         public string Type { get; private set; } = type;
-        private readonly Dictionary<string, List<string>> _dictionary = new();
+        public readonly Dictionary<string, List<string>> WordMap = new();
 
         public static Dictionary? GetDictionaryByType(string type) => Dictionaries.Find(dictionary => dictionary.Type == type);
 
@@ -12,8 +12,8 @@
         {
             try
             {
-                _dictionary.First(pair => pair.Key == word);
-                return _dictionary.First(pair => pair.Key == word).Value;
+                WordMap.First(pair => pair.Key == word);
+                return WordMap.First(pair => pair.Key == word).Value;
             }
             catch (Exception e)
             {
@@ -21,35 +21,35 @@
             }
         }
 
-        public void AddWord(string word, string translation) => _dictionary.Add(word, [translation]);
+        public void AddWord(string word, string translation) => WordMap.Add(word, [translation]);
 
         public void ChangeWord(string wordToReplace, string newWord)
         {
-            var translations = _dictionary[wordToReplace];
-            _dictionary.Remove(wordToReplace);
+            var translations = WordMap[wordToReplace];
+            WordMap.Remove(wordToReplace);
 
-            _dictionary.Add(newWord, translations);
+            WordMap.Add(newWord, translations);
         }
 
-        public void RemoveWord(string word) => _dictionary.Remove(word);
+        public void RemoveWord(string word) => WordMap.Remove(word);
 
         public void AddTranslation(string translation, string word)
         {
-            var translations = _dictionary[word];
+            var translations = WordMap[word];
             translations.Add(translation);
 
-            _dictionary[word] = translations;
+            WordMap[word] = translations;
         }
 
         public void ChangeTranslation(string translationToChange, string word, string newTranslation)
         {
-            var translations = _dictionary[word];
+            var translations = WordMap[word];
             translations[translations.FindIndex(el => el == translationToChange)] = newTranslation;
         }
 
         public bool RemoveTranslation(string translation, string word)
         {
-            var translations = new List<string>(_dictionary[word]);
+            var translations = new List<string>(WordMap[word]);
             translations.Remove(translation);
 
             if (translations.Count == 0)
@@ -58,7 +58,7 @@
             }
             else
             {
-                _dictionary[word] = translations;
+                WordMap[word] = translations;
                 return true;
             }
         }
